@@ -1,0 +1,144 @@
+---
+title: "CourseProject:Prediction Assignment"
+author: "Venkata Duvvuri"
+date: "May 5, 2018"
+output:
+  html_document: default
+  pdf_document: default
+---
+#Prediction Assignment
+
+```{r}
+# required machine learning packages
+#install.packages("caret")
+#install.packages("randomForest")
+#install.packages("rpart")
+#install.packages("rpart.plot")
+#install.packages("ROCR")
+
+# Other required packages
+#install.packages("tidyverse")
+
+library(caret)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(ROCR)
+library(tidyverse)
+```
+
+```{r}
+# setting seed
+set.seed(1234)
+```
+#1. Load training and tests datasets from given urls.
+```{r}
+trainingdata <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+testdata <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+```
+# saved to local working directory
+```{r}
+write.csv(trainingdata, "trainingdata.csv")
+write.csv(testdata, "testdata.csv")
+```
+# Structure of data
+```{r}
+str(trainingdata)
+str(testdata)
+# The results from struture of data revealed that datasets contains missing values as "#DIV/0!". Replacing all missing with "NA", the function na.strings=c("NA","#DIV/0!", "") was used. 
+```
+# #2.  Pre-processing of datasets. Remove "NA", "#DIV/0!" from data
+```{r}
+traindata <- read.csv("trainingdata.csv", na.strings=c("NA","#DIV/0!", ""))
+write.csv(traindata, "traindata.csv")
+testdata<-read.csv("testdata.csv", na.strings=c("NA","#DIV/0!", ""))
+write.csv(traindata, "testdata.csv")
+```
+# Check dimensions for number of variables and number of observations
+```{r}
+dim(traindata)
+dim(testdata)
+```
+# summary of training and test data
+```{r}
+summary(traindata)
+summary(testdata)
+```
+
+```{r}
+# The summary results revealed that some columns contains all "NA". So deleted columns with all missing values
+traindataset<-traindata[,colSums(is.na(traindata)) == 0]
+testdataset <-testdata[,colSums(is.na(testdata)) == 0]
+# summary of training and test data after removal of NAs
+summary(traindataset)
+summary(testdataset)
+#Structure of data
+str(traindataset)
+str(testdataset)
+# Variables "X.1", "X", user_name", "raw_timestamp_part_1", "raw_timestamp_part_,2" "cvtd_timestamp", "new_window", and  "num_window" (columns 1 to 8) are irrelevant in analysis. So deleted these variables.
+traindataset   <-traindataset[,-c(1:8)]
+testdataset <-testdataset[,-c(1:8)]
+#saved to working dir
+write.csv(traindataset, "traindataset.csv")
+write.csv(testdataset , "testdataset.csv")
+# Review final datasets
+head(traindataset)
+head(testdataset)
+dim(traindataset)
+dim(testdataset)
+```
+#3. Partitioning the training data set to allow cross-validation
+# traindataset:53 variables and 19622 obs
+# testdataset: 53 variables and 20 obs.
+
+```{r}
+#In order to perform cross-validation, the training data set is partionned into 2 sets: subTraining (75%) and subTest (25%).
+subsamples <- createDataPartition(y=traindataset$classe, p=0.75, list=FALSE)
+subTraining <- traindataset[subsamples, ] 
+subTesting <- traindataset[-subsamples, ]
+dim(subTraining)
+dim(subTesting)
+head(subTraining)
+head(subTesting)
+```
+# 4a. First Prediction model with Decision Tree
+```{r}
+# Using rpart: Decision Tree
+decisiontreemodel <- rpart(classe ~ ., data=subTraining, method="class")
+decisiontreemodel_summary = summary(decisiontreemodel)
+
+# Predicting using subTesting data
+prediction <- predict(decisiontreemodel, subTesting, type = "class")
+
+# Plot of the Decision Tree: decisiontreemodel1
+prp(decisiontreemodel, faclen = 0, cex = 0.5, extra = 102, xsep="/")
+
+# Test the results (prediction) on our subTesting data set with confusionMatrix
+confusionMatrix(prediction, subTesting$classe)
+
+# RESULTS of Decision tree Model: Results from confusionMatrix reported prediction accuracy 0.7372 (95% CI 0.7246, 0.7494)
+```
+# 4b. Second Prediction model with RandomForests
+```{r}
+# Using RandomForest
+rftreemodel <- randomForest(classe ~ ., data=subTraining, method="class")
+
+# Predicting using subTesting data
+prediction1 <- predict(rftreemodel, subTesting, type = "class")
+
+# Test results on subTesting data set:
+confusionMatrix(prediction1, subTesting$classe)
+
+# Results from confusionMatrix reported prediction accuracy 0.9947 (95% CI 0.9922, 0.9965)
+
+# **RESULT**: When comparing the RESULTS from rpart (decision tree) and RandomForest Model), RandomForest Model (0.9947) outperfomred rpart (0.7372).  Hence, I chose the Random Forest model to conduct predictions using main testdataset. The accuracy of the Random Forest model is 0.995 or 99.5%, and the out-of-sample error is estimated at 0.005, or 0.5%. The expected out-of-sample error is calculated as 1 - prediction accuracy made against the cross-validation set. 
+
+# The given test dataset comprises 53 variables and 20 obs. With a prediction accuracy of RandomForest model  99.5% on our cross-validation data i.e., subTestingdata, I could expect minimum or no misclassification of target variable "Classe".
+
+# predict outcome levels on the main Testing dataset using Random Forest algorithm
+predictionfinal <- predict(rftreemodel, testdataset, type="class")
+
+# plot prediction final results
+plot(predictionfinal) 
+```
+
